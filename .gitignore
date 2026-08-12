@@ -1,0 +1,16 @@
+# Configuracion local y secretos (la plantilla segura sí se versiona)
+.env
+.env.*
+!.env.example
+credentials*.json
+secrets*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+catalogo_chatbot.json
