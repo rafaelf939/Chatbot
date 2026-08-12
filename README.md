@@ -44,6 +44,19 @@ El secreto es obligatorio para recibir eventos y se compara de manera segura; si
 
 Respuesta exitosa: HTTP `202` con el UUID del evento. Un secreto ausente o incorrecto devuelve `401`.
 
+### Consulta temporal de eventos en desarrollo
+
+Cuando `DATABASE_ENABLED=false`, la API habilita temporalmente dos endpoints de depuración para inspeccionar los eventos conservados por `InMemoryEventRepository`:
+
+```bash
+curl http://localhost:8000/api/v1/debug/events
+curl http://localhost:8000/api/v1/debug/events/latest
+```
+
+El primero devuelve todos los eventos recibidos desde que arrancó el proceso y el segundo devuelve el más reciente. Si todavía no se recibió ninguno, el endpoint `latest` responde `404`. Como el almacenamiento es volátil, reiniciar la API o recargarla elimina los eventos.
+
+Estos endpoints son exclusivamente para desarrollo y **no deben exponerse en producción**. Cuando `DATABASE_ENABLED=true`, las rutas no se registran y tampoco aparecen en el esquema OpenAPI. No devuelven secretos ni variables de entorno, pero sí el payload original recibido, que puede contener información sensible enviada por el cliente.
+
 ## SQL Server
 
 Ejecute [sql/001_create_tables.sql](sql/001_create_tables.sql) en la base elegida. Después configure:

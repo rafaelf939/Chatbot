@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.debug_routes import router as debug_router
 from app.api.routes import router
 from app.core.config import Settings
 from app.repositories.events import InMemoryEventRepository, SqlServerEventRepository
@@ -20,8 +21,9 @@ def create_app(settings: Settings | None = None, repository=None) -> FastAPI:
     application.state.settings = settings
     application.state.event_service = EventService(repository)
     application.include_router(router)
+    if not settings.database_enabled:
+        application.include_router(debug_router)
     return application
 
 
 app = create_app()
-
