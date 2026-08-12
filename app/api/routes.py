@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, s
 
 from app.models.events import EventAccepted
 from app.services.events import EventService
+from app.services.kommo_payloads import parse_kommo_form_payload
 
 router = APIRouter()
 
@@ -58,11 +59,14 @@ async def receive_event(
     service: EventService = Depends(get_event_service),
 ) -> EventAccepted:
     content_type = request.headers.get("content-type", "")
-    if "application/json" in content_type:
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    if media_type == "application/json" or media_type.endswith("+json"):
         try:
             payload: Any = await request.json()
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
+    elif media_type == "application/x-www-form-urlencoded":
+        payload = parse_kommo_form_payload(await request.body())
     else:
         raw = await request.body()
         payload = {"raw_body": raw.decode("utf-8", errors="replace"), "content_type": content_type}

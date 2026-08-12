@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from app.api.debug_routes import router as debug_router
 from app.api.routes import router
 from app.core.config import Settings
+from app.middleware.diagnostics import KommoDiagnosticMiddleware
+from app.repositories.diagnostics import InMemoryDiagnosticRepository
 from app.repositories.events import InMemoryEventRepository, SqlServerEventRepository
 from app.services.events import EventService
 
@@ -22,6 +24,13 @@ def create_app(settings: Settings | None = None, repository=None) -> FastAPI:
     application.state.event_service = EventService(repository)
     application.include_router(router)
     if not settings.database_enabled:
+        diagnostic_repository = InMemoryDiagnosticRepository(max_requests=50)
+        application.state.diagnostic_repository = diagnostic_repository
+        application.add_middleware(
+            KommoDiagnosticMiddleware,
+            repository=diagnostic_repository,
+            webhook_secret=settings.webhook_secret,
+        )
         application.include_router(debug_router)
     return application
 

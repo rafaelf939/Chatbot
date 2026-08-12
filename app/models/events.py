@@ -12,6 +12,9 @@ class ChatbotEvent(BaseModel):
     opcion_codigo: str
     callback_data: str | None = None
     lead_id_kommo: str | None = None
+    status_id_kommo: str | None = None
+    pipeline_id_kommo: str | None = None
+    account_id_kommo: str | None = None
     contact_id_kommo: str | None = None
     conversation_id: str | None = None
     payload_original: Any
@@ -21,4 +24,3 @@ class ChatbotEvent(BaseModel):
 class EventAccepted(BaseModel):
     id_evento: UUID
     status: str = "accepted"
-
