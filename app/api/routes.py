@@ -5,6 +5,7 @@ from urllib.parse import parse_qsl, urlencode
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 
 from app.models.events import EventAccepted
+from app.repositories.events import EventPersistenceError
 from app.services.events import EventService
 from app.services.kommo_payloads import parse_kommo_form_payload
 
@@ -70,5 +71,8 @@ async def receive_event(
     else:
         raw = await request.body()
         payload = {"raw_body": raw.decode("utf-8", errors="replace"), "content_type": content_type}
-    event = service.register(bot_codigo, opcion_codigo, payload)
+    try:
+        event = service.register(bot_codigo, opcion_codigo, payload)
+    except EventPersistenceError:
+        raise HTTPException(status_code=503, detail="Event persistence unavailable") from None
     return EventAccepted(id_evento=event.id_evento)

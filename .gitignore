@@ -4,6 +4,12 @@
 !.env.example
 credentials*.json
 secrets*.json
+credenciales*
+secretos*
+*connection-string*
+*.dsn
+odbc.ini
+.odbc.ini
 kommo_secret
 *.pem
 *.key

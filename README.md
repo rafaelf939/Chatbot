@@ -95,18 +95,46 @@ curl http://localhost:8000/api/v1/debug/requests/latest
 
 El diagnóstico incluye método, path, status, metadatos HTTP permitidos, tamaño del body y cuerpos pequeños de formatos textuales conocidos. Los cuerpos mayores de 16 KiB no se conservan. El query parameter `token`, los headers de autenticación y cookies, los campos sensibles del body y el valor de `WEBHOOK_SECRET` se redactan o se excluyen. Este registro es volátil, existe exclusivamente para diagnosticar el MVP en desarrollo y **no debe habilitarse ni exponerse en producción**.
 
-## SQL Server
+## Persistencia en SQL Server
 
-Ejecute [sql/001_create_tables.sql](sql/001_create_tables.sql) en la base elegida. Después configure:
+La selección del repositorio está centralizada. Con `DATABASE_ENABLED=false` los eventos permanecen en memoria y se habilitan los endpoints debug. El inicio habitual de este modo continúa siendo:
+
+```bash
+python scripts/start_dev_webhook.py
+```
+
+Ese script fuerza deliberadamente `DATABASE_ENABLED=false`. Para utilizar SQL Server en una prueba posterior, configure por separado:
 
 ```bash
 export DATABASE_ENABLED=true
-export SQLSERVER_CONNECTION_STRING='DRIVER={ODBC Driver 18 for SQL Server};SERVER=...'
+export WEBHOOK_SECRET='secreto-del-webhook'
+export DB_SERVER='sqlserver.example.internal'
+export DB_PORT=1433
+export DB_NAME='chatbot'
+export DB_USER='chatbot_app'
+export DB_PASSWORD='secreto-administrado-fuera-del-repositorio'
+export DB_DRIVER='ODBC Driver 18 for SQL Server'
+export DB_ENCRYPT=true
+export DB_TRUST_SERVER_CERTIFICATE=false
 ```
 
-`CHATBOT_OPCION` mantiene el catálogo y asegura unicidad por bot. `CHATBOT_EVENTO` mantiene hechos de interacción, el callback observado y el JSON original. Sus índices soportan conteos por fecha, bot, opción, contacto y conversación. Los identificadores se guardan como texto para tolerar el formato que finalmente entregue Kommo.
+`DB_ENCRYPT=true` y `DB_TRUST_SERVER_CERTIFICATE=false` son los valores seguros predeterminados para ODBC Driver 18. `DB_TRUST_SERVER_CERTIFICATE=true` solo debe utilizarse de manera consciente en un entorno de desarrollo con un certificado que no pueda validarse; no debe asumirse en producción.
 
-Antes de recibir eventos debe cargarse el catálogo correspondiente, porque la tabla de eventos tiene una clave foránea `(bot_codigo, opcion_codigo)`.
+Para comprobar únicamente la conectividad y ejecutar `SELECT 1`, sin crear tablas ni insertar datos:
+
+```bash
+python scripts/check_db_connection.py
+```
+
+La tabla se crea explícitamente ejecutando [sql/002_create_chatbot_evento.sql](sql/002_create_chatbot_evento.sql) mediante SSMS, Azure Data Studio, `sqlcmd` u otra herramienta autorizada. La API y el script de conectividad nunca ejecutan migraciones ni requieren permisos DDL. Con SQL habilitado, un INSERT confirmado devuelve `202`; un fallo devuelve `503` sin revelar la cadena de conexión. No existe fallback silencioso a memoria y los endpoints debug no se registran.
+
+Después de comprobar la conexión y ejecutar la migración, el arranque específico para una prueba SQL será:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --no-access-log
+```
+
+No use `scripts/start_dev_webhook.py` para esa prueba, porque actualmente ese script restablece intencionalmente `DATABASE_ENABLED=false`.
 
 ## Extraer el catálogo de Kommo
 

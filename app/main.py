@@ -5,19 +5,14 @@ from app.api.routes import router
 from app.core.config import Settings
 from app.middleware.diagnostics import KommoDiagnosticMiddleware
 from app.repositories.diagnostics import InMemoryDiagnosticRepository
-from app.repositories.events import InMemoryEventRepository, SqlServerEventRepository
+from app.repositories.factory import create_event_repository
 from app.services.events import EventService
 
 
 def create_app(settings: Settings | None = None, repository=None) -> FastAPI:
     settings = settings or Settings.from_env()
     if repository is None:
-        if settings.database_enabled:
-            if not settings.sqlserver_connection_string:
-                raise RuntimeError("SQLSERVER_CONNECTION_STRING is required when DATABASE_ENABLED=true")
-            repository = SqlServerEventRepository(settings.sqlserver_connection_string)
-        else:
-            repository = InMemoryEventRepository()
+        repository = create_event_repository(settings)
 
     application = FastAPI(title="AAFP Chatbot Analytics API", version="0.1.0")
     application.state.settings = settings
