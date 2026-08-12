@@ -42,6 +42,14 @@ curl -X POST http://localhost:8000/api/v1/kommo/events/bot-faq-aafp/estado-de-cu
 
 El secreto es obligatorio para recibir eventos y se compara de manera segura; si no está configurado, el endpoint devuelve `503`. El cuerpo JSON completo se guarda en `payload_original`. Mientras se confirma el payload real de Kommo, la API busca de forma recursiva las claves `lead_id`, `contact_id`, `conversation_id` y `callback_data`; si el webhook no es JSON también conserva su contenido como texto y su `Content-Type`.
 
+Para la prueba temporal desde el bloque nativo **Enviar webhook** de Kommo Salesbot, que no permite configurar el header personalizado, también se acepta el mismo secreto mediante el query parameter `token`:
+
+```text
+/api/v1/kommo/events/bot-faq-aafp/estado-de-cuenta?token=un-secreto-local
+```
+
+La autenticación se acepta si coincide `X-Webhook-Secret` o `token`; el header continúa siendo el mecanismo principal. El parámetro `token` es una solución exclusiva para desarrollo/MVP y **no es el mecanismo recomendado para producción**, porque las URLs pueden quedar expuestas en historiales o sistemas intermediarios. La aplicación elimina este parámetro del query string antes de generar su respuesta para evitar incluir el secreto en el access log de Uvicorn, y nunca lo incorpora en `payload_original`.
+
 Respuesta exitosa: HTTP `202` con el UUID del evento. Un secreto ausente o incorrecto devuelve `401`.
 
 ### Consulta temporal de eventos en desarrollo

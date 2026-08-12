@@ -1,7 +1,8 @@
 import hmac
 from typing import Any
+from urllib.parse import parse_qsl, urlencode
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 
 from app.models.events import EventAccepted
 from app.services.events import EventService
@@ -13,11 +14,29 @@ async def get_event_service(request: Request) -> EventService:
     return request.app.state.event_service
 
 
-async def verify_secret(request: Request, x_webhook_secret: str | None = Header(default=None)) -> None:
+def _remove_token_from_query_string(request: Request) -> None:
+    query_string = request.scope.get("query_string", b"").decode("latin-1")
+    query_parameters = parse_qsl(query_string, keep_blank_values=True)
+    sanitized_parameters = [(key, value) for key, value in query_parameters if key != "token"]
+    request.scope["query_string"] = urlencode(sanitized_parameters, doseq=True).encode("ascii")
+
+
+def _matches_secret(candidate: str | None, expected: str) -> bool:
+    return candidate is not None and hmac.compare_digest(candidate.encode(), expected.encode())
+
+
+async def verify_secret(
+    request: Request,
+    x_webhook_secret: str | None = Header(default=None),
+    token: str | None = Query(default=None),
+) -> None:
+    _remove_token_from_query_string(request)
     expected = request.app.state.settings.webhook_secret
     if not expected:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Webhook secret is not configured")
-    if not x_webhook_secret or not hmac.compare_digest(x_webhook_secret, expected):
+    valid_header = _matches_secret(x_webhook_secret, expected)
+    valid_token = _matches_secret(token, expected)
+    if not valid_header and not valid_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
 
 

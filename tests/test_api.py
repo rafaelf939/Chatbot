@@ -44,6 +44,80 @@ def test_wrong_secret_is_rejected_without_persistence():
     assert repository.events == []
 
 
+def test_valid_webhook_token_is_accepted_without_being_persisted():
+    app, repository = app_and_repository()
+    query_strings_after_request = []
+
+    @app.middleware("http")
+    async def capture_sanitized_query_string(request, call_next):
+        response = await call_next(request)
+        query_strings_after_request.append(request.scope["query_string"])
+        return response
+
+    payload = {"lead_id": 789, "message": "token is not part of this payload"}
+    response = asyncio.run(request(
+        app,
+        "POST",
+        "/api/v1/kommo/events/faq/estado-cuenta?token=test-secret&source=kommo",
+        json=payload,
+    ))
+
+    assert response.status_code == 202
+    assert len(repository.events) == 1
+    assert repository.events[0].payload_original == payload
+    assert query_strings_after_request == [b"source=kommo"]
+
+
+def test_wrong_webhook_token_is_rejected_without_persistence():
+    app, repository = app_and_repository()
+
+    response = asyncio.run(request(
+        app, "POST", "/api/v1/kommo/events/faq/x?token=wrong", json={},
+    ))
+
+    assert response.status_code == 401
+    assert repository.events == []
+
+
+def test_valid_header_is_accepted_even_when_token_is_wrong():
+    app, repository = app_and_repository()
+
+    response = asyncio.run(request(
+        app,
+        "POST",
+        "/api/v1/kommo/events/faq/x?token=wrong",
+        json={},
+        headers={"X-Webhook-Secret": "test-secret"},
+    ))
+
+    assert response.status_code == 202
+    assert len(repository.events) == 1
+
+
+def test_missing_header_and_token_are_rejected_without_persistence():
+    app, repository = app_and_repository()
+
+    response = asyncio.run(request(
+        app, "POST", "/api/v1/kommo/events/faq/x", json={},
+    ))
+
+    assert response.status_code == 401
+    assert repository.events == []
+
+
+def test_unconfigured_webhook_secret_keeps_service_unavailable_response():
+    repository = InMemoryEventRepository()
+    app = create_app(Settings("", False, None), repository)
+
+    response = asyncio.run(request(
+        app, "POST", "/api/v1/kommo/events/faq/x?token=anything", json={},
+    ))
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Webhook secret is not configured"}
+    assert repository.events == []
+
+
 def test_debug_events_returns_all_received_events():
     app, _ = app_and_repository()
     first_payload = {"lead_id": 123, "callback_data": "first"}
